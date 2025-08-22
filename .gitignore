@@ -1,0 +1,10 @@
+TODO.md
+.vscode/
+tests/
+results/
+build/
+dist/
+*.egg-info/
+*.egg
+__pycache__/
+

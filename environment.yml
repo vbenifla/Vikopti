@@ -1,0 +1,16 @@
+name: vikopti-env
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python
+  - pip
+  - setuptools
+  - yaml
+  - pyyaml
+  - numpy
+  - scipy
+  - joblib
+  - seaborn

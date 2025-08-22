@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vikopti"
+authors = [{name = "Victor Benifla", email = "vbenifla@gmail.com" }]
+description = "A Python project for design optimization using genetic algorithms"
+readme = "README.md"
+requires-python = ">=3"
+license = {file = "LICENSE.txt"}
+version = "9.2"
+
+[tool.setuptools.packages.find]
+include = ["vikopti*"]
