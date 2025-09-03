@@ -24,28 +24,12 @@ class VIKGA:
         - It avoid redundant objective function evaluations.
     """
 
-    def __init__(self, config: Config = None, **config_kwargs):
+    def __init__(self):
         """
-        Initialize the VIKGA object and set its configuration.
-
-        Parameters
-        ----------
-        config : Config, optional
-            A "Config" object. If not provided, the default configuration is used.
-        **config_kwargs : dict, optional
-            Keyword arguments to override the algorithm's configuration parameters.
-            Only keys matching attributes of "Config" are applied.
-            See the "Config" class for available parameters and their defaults.
+        Initialize the VIKGA object and set its default configuration.
         """
-        # Initialize configuration
-        self.config = Config() if config is None else config
-
-        # Override configuration with provided keyword arguments
-        for key, value in config_kwargs.items():
-            if hasattr(self.config, key):
-                setattr(self.config, key, value)
-            else:
-                print(f"Unknown config parameter: '{key}'")
+        # Initialize default configuration
+        self.config = Config()
 
     def run(self, problem: Problem, **run_kwargs):
         """

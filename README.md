@@ -4,12 +4,6 @@ VIKOpti is an open-source python project for design optimization using an effici
 
 ## Getting Started
 
-### Prerequisites
-
-- [Python](https://www.python.org/)
-- [Scipy](https://scipy.org/)
-- [Seaborn](https://seaborn.pydata.org/)
-
 ### Installation
 
 First, clone or download the project repository and go to its directory:
@@ -19,7 +13,7 @@ git clone https://github.com/vbenifla/VIKOpti.git
 cd VIKOpti
 ```
 
-Make sure prerequisites are already installed and install the package:
+Make sure dependencies are already installed and install the package:
 
 ```console
 pip install .
