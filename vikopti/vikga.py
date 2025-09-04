@@ -126,10 +126,7 @@ class VIKGA:
                 save_dir = Path.cwd() / "results" / self.pb.name
             else:
                 save_dir = Path(self.config.save_dir)
-                if save_dir.is_absolute():
-                    save_dir = save_dir / self.pb.name
-                else:
-                    save_dir = Path.cwd() / save_dir / self.pb.name
+                save_dir = Path.cwd() / "results" / self.pb.name / save_dir
             save_dir.mkdir(parents=True, exist_ok=True)
             self.config.save_dir = save_dir
 
@@ -256,7 +253,9 @@ class VIKGA:
             std_per_var = np.std(recent_xs, axis=0)
             if (obj_range < 1e-6) and (np.all(std_per_var < 1e-6)):
                 if self.config.display:
-                    print(f"\nConvergence: obj_range={obj_range}, x_std={std_per_var} !")
+                    print(
+                        f"\nConvergence: obj_range={obj_range}, x_std={std_per_var} !"
+                    )
                 return False
         return True
 
@@ -276,7 +275,11 @@ class VIKGA:
 
         # Compute scaled fitness
         self.fs[: self.c_pop], self.mins = scale_fitness(
-            self.f[: self.c_pop], dist, self.is_feasible, d=self.config.d_mins, n=self.config.n_mins
+            self.f[: self.c_pop],
+            dist,
+            self.is_feasible,
+            d=self.config.d_mins,
+            n=self.config.n_mins,
         )
 
         # Print info in the console
@@ -287,7 +290,9 @@ class VIKGA:
             )
 
         # Log current generation results
-        self.gen.append([self.c_pop, self.c_cross, self.c_mute, len(self.mins), self.mins[0]])
+        self.gen.append(
+            [self.c_pop, self.c_cross, self.c_mute, len(self.mins), self.mins[0]]
+        )
         if self.config.save:
             self._log_gen()
 
@@ -325,7 +330,9 @@ class VIKGA:
             id_pop = np.setdiff1d(np.arange(self.c_pop), id_p1)
             prox = 1.0 / self.dist[id_pop, id_p1]
             p_dist = prox / np.sum(prox)
-            crowd = np.random.choice(id_pop, self.config.n_crowd, p=p_dist, replace=False)
+            crowd = np.random.choice(
+                id_pop, self.config.n_crowd, p=p_dist, replace=False
+            )
             id_p2 = crowd[np.argmax(self.fs[crowd])]
 
             # Cross parents
@@ -398,11 +405,17 @@ class VIKGA:
 
             # update distance matrix
             x_add = self.x[self.c_pop - sum(c_add) : self.c_pop]
-            dist0 = cdist(x_add, self.x[: self.c_pop - sum(c_add)], "euclidean") / self.pb.sf
+            dist0 = (
+                cdist(x_add, self.x[: self.c_pop - sum(c_add)], "euclidean")
+                / self.pb.sf
+            )
             dist1 = cdist(x_add, x_add, "euclidean") / self.pb.sf
             self.dist[: self.c_pop, : self.c_pop] = np.block(
                 [
-                    [self.dist[: self.c_pop - sum(c_add), : self.c_pop - sum(c_add)], dist0.T],
+                    [
+                        self.dist[: self.c_pop - sum(c_add), : self.c_pop - sum(c_add)],
+                        dist0.T,
+                    ],
                     [dist0, dist1],
                 ]
             )
@@ -459,7 +472,11 @@ class VIKGA:
         # Prepare lines to write
         lines = []
         for i in range(len(x)):
-            data = [str(v) for v in x[i]] + [str(v) for v in obj[i]] + [str(v) for v in const[i]]
+            data = (
+                [str(v) for v in x[i]]
+                + [str(v) for v in obj[i]]
+                + [str(v) for v in const[i]]
+            )
             line = " ".join(data) + "\n"
             lines.append(line)
 
