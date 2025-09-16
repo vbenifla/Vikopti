@@ -81,7 +81,9 @@ def pm(x: float, b0: float, b1: float, eta: float = 5.0):
 MUTATIONS = {"nm": nm, "cm": cm, "pm": pm}
 
 
-def mutate(x: np.ndarray, bounds: np.ndarray, method="pm", p: float = 0.5, eta: float = 5.0):
+def mutate(
+    x: np.ndarray, bounds: np.ndarray, method="pm", p: float = 0.5, eta: float = 5.0
+):
     """
     Mutate one individual using the specified method.
 

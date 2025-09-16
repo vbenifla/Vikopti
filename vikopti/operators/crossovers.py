@@ -76,7 +76,9 @@ def pnx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
 CROSSOVERS = {"sbx": sbx, "pnx": pnx}
 
 
-def cross(xp1: np.ndarray, xp2: np.ndarray, bounds: np.ndarray, method="sbx", eta: float = 5.0):
+def cross(
+    xp1: np.ndarray, xp2: np.ndarray, bounds: np.ndarray, method="sbx", eta: float = 5.0
+):
     """
     Perform crossover between two parents using the specified method.
 
@@ -103,7 +105,9 @@ def cross(xp1: np.ndarray, xp2: np.ndarray, bounds: np.ndarray, method="sbx", et
     xo2 = np.copy(xp2)
     for i in range(n):
         if xp2[i] != xp1[i]:
-            xo1[i], xo2[i] = CROSSOVERS[method](xp1[i], xp2[i], bounds[0][i], bounds[1][i], eta)
+            xo1[i], xo2[i] = CROSSOVERS[method](
+                xp1[i], xp2[i], bounds[0][i], bounds[1][i], eta
+            )
             if xo1[i] < bounds[0][i] or xo1[i] > bounds[1][i]:
                 xo1[i] = xp1[i]
             if xo2[i] < bounds[0][i] or xo2[i] > bounds[1][i]:

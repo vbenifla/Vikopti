@@ -50,7 +50,9 @@ class Results:
         x = pop[:, :nvar]
         diff = x[self.res["mins"]][:, None, :] - x[self.res["mins"]][None, :, :]
         dist = np.linalg.norm(diff, axis=-1) / self.pb["sf"]
-        df_mins["dist"] = np.min(np.where(np.eye(dist.shape[0], dtype=bool), np.inf, dist), axis=0)
+        df_mins["dist"] = np.min(
+            np.where(np.eye(dist.shape[0], dtype=bool), np.inf, dist), axis=0
+        )
         self.df_mins = df_mins.sort_values(by="f", ascending=False)
 
     @classmethod
@@ -85,8 +87,12 @@ class Results:
         diff = x[:, None, :] - x[None, :, :]
         dist = np.linalg.norm(diff, axis=-1) / pb["sf"]
         f, is_feasible, pen = compute_fitness(obj[:, 0], const, alpha=config["alpha"])
-        fs, mins = scale_fitness(f, dist, is_feasible, d=config["d_mins"], n=config["n_mins"])
-        pop = np.concatenate([x, obj, const, f[:, np.newaxis], fs[:, np.newaxis]], axis=1)
+        fs, mins = scale_fitness(
+            f, dist, is_feasible, d=config["d_mins"], n=config["n_mins"]
+        )
+        pop = np.concatenate(
+            [x, obj, const, f[:, np.newaxis], fs[:, np.newaxis]], axis=1
+        )
 
         # Read algorithm generation results
         gen = np.loadtxt(os.path.join(path, "gen.txt"))
@@ -176,7 +182,9 @@ class Results:
             # Add colorbar
             cbar = plt.colorbar(scatter, ax=ax, pad=0.02)
             cbar.set_label("f", rotation=0, labelpad=15)
-            cbar.set_ticks(np.linspace(self.df_pop["f"].min(), self.df_pop["f"].max(), 5))
+            cbar.set_ticks(
+                np.linspace(self.df_pop["f"].min(), self.df_pop["f"].max(), 5)
+            )
 
             # Set labels
             ax.set_xlabel(self.pb["vars"][0])
@@ -246,10 +254,16 @@ class Results:
             sm.set_array([])
 
             # Create a new axis for the colorbar
-            cbar_ax = g.figure.add_axes([0.93, 0.2, 0.02, 0.6])  # [left, bottom, width, height]
+            cbar_ax = g.figure.add_axes(
+                [0.93, 0.2, 0.02, 0.6]
+            )  # [left, bottom, width, height]
             cbar = g.figure.colorbar(sm, cax=cbar_ax)
-            cbar.set_label("f", rotation=0, labelpad=15)  # Horizontal label with padding
-            cbar.set_ticks(np.linspace(df["f"].min(), df["f"].max(), 5))  # Set ticks from 0 to 1
+            cbar.set_label(
+                "f", rotation=0, labelpad=15
+            )  # Horizontal label with padding
+            cbar.set_ticks(
+                np.linspace(df["f"].min(), df["f"].max(), 5)
+            )  # Set ticks from 0 to 1
 
             # Display figure
             if display:

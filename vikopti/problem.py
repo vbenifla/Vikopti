@@ -93,7 +93,9 @@ class Problem:
 
                 # Shade the areas where any constraint is satisfied
                 if self.n_con:
-                    plt.fill_between(x, f, where=mask, color="grey", alpha=0.5, label="g > 0")
+                    plt.fill_between(
+                        x, f, where=mask, color="grey", alpha=0.5, label="g > 0"
+                    )
 
                 # Format figure
                 ax.set_xlim(self.bounds[0][0], self.bounds[1][0])
@@ -117,7 +119,9 @@ class Problem:
                 # Mask constrained regions
                 if self.n_con > 0:
                     const = results[1:]
-                    mask = np.all(const <= np.zeros(self.n_con)[:, np.newaxis, np.newaxis], axis=0)
+                    mask = np.all(
+                        const <= np.zeros(self.n_con)[:, np.newaxis, np.newaxis], axis=0
+                    )
                     z[~mask] = np.nan
 
                 # Plot

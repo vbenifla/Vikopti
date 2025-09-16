@@ -113,7 +113,9 @@ def compute_penalty(const: np.ndarray):
     return pen
 
 
-def scale_fitness(f: np.ndarray, dist: np.ndarray, is_feasible, d: float = 0.1, n: int = 4):
+def scale_fitness(
+    f: np.ndarray, dist: np.ndarray, is_feasible, d: float = 0.1, n: int = 4
+):
     """
     Perform the fitness scaling operation used in the CMNGA.
     Scales the fitness values to each local optima identified.
@@ -159,7 +161,9 @@ def scale_fitness(f: np.ndarray, dist: np.ndarray, is_feasible, d: float = 0.1, 
     return fs, ids
 
 
-def get_optima(f: np.ndarray, dist: np.ndarray, is_feasible, d: float = 0.1, n: int = 4):
+def get_optima(
+    f: np.ndarray, dist: np.ndarray, is_feasible, d: float = 0.1, n: int = 4
+):
     """
     Identify local optima based on neighbors' fitness values.
 

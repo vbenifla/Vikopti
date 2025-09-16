@@ -10,11 +10,18 @@ CMAP.set_bad(color="lightgray")
 BLUE = "cornflowerblue"
 
 
-# Context managers to prevent any console outputs during problem'func run
 @contextmanager
-def silencer(out=open(os.devnull, "w"), err=open(os.devnull, "w")):
-    with redirect_stdout(out), redirect_stderr(err):
-        yield
+def silencer(out=None, err=None):
+    if out is None:
+        out = open(os.devnull, "w")
+    if err is None:
+        err = open(os.devnull, "w")
+    try:
+        with redirect_stdout(out), redirect_stderr(err):
+            yield
+    finally:
+        out.close()
+        err.close()
 
 
 @contextmanager
