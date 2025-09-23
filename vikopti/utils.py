@@ -1,5 +1,7 @@
 import os
 import sys
+import warnings
+import numpy as np
 import matplotlib
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
@@ -41,3 +43,66 @@ def silencer_full():
         os.dup2(stderr_fd_dup, stderr_fd)
         os.close(stdout_fd_dup)
         os.close(stderr_fd_dup)
+
+
+def Znorm(arr: np.ndarray):
+    """
+    Normalize a 1D numpy array between 0 and 1.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        1D array to normalize.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized array between 0 and 1.
+        If the array is constant, the original array is returned.
+    """
+    # Check array dimension
+    if arr.ndim != 1:
+        raise ValueError("Input must be a 1D numpy array")
+
+    # Get min, max values
+    mean_val = arr.mean()
+    std_val = arr.std()
+
+    # Handle constant array
+    if std_val == 0:
+        eps = 1e-12
+    else:
+        eps = 0
+
+    return (arr - mean_val) / (std_val + eps)
+
+
+def norm1D(arr: np.ndarray):
+    """
+    Normalize a 1D numpy array between 0 and 1.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        1D array to normalize.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized array between 0 and 1.
+        If the array is constant, the original array is returned.
+    """
+    # Check array dimension
+    if arr.ndim != 1:
+        raise ValueError("Input must be a 1D numpy array")
+
+    # Get min, max values
+    min_val = arr.min()
+    max_val = arr.max()
+
+    # Handle constant array
+    if np.isclose(max_val, min_val):
+        warnings.warn("Input array is constant; returning original array unchanged.")
+        return arr.astype(float)
+
+    return (arr - min_val) / (max_val - min_val)

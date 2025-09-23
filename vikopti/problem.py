@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.spatial.distance import cdist
 from .utils import CMAP, BLUE
 
 
@@ -8,14 +9,17 @@ class Problem:
     Class representing an optimization problem.
     """
 
-    def __init__(self, bounds: list, n_obj: int = 1, n_con: int = 0, **kwargs):
+    def __init__(
+        self, bounds: list[list[float]], n_obj: int = 1, n_con: int = 0, **kwargs
+    ):
         """
         Initialize the Problem object and set the different attributes.
 
         Parameters
         ----------
-        bounds : list
-            Lower and upper bounds of the design space.
+        bounds : list of lists
+            A two-element list: [lower_bounds, upper_bounds].
+            Each must be a list of same length.
         n_obj : int, optional
             number of objectives, by default 1.
         n_con : int, optional
@@ -27,7 +31,7 @@ class Problem:
         self.n_var = len(bounds[0])
         self.vars = kwargs.get("vars", [f"x{i}" for i in range(self.n_var)])
         self.bounds = bounds
-        self.sf = float(np.linalg.norm(np.array(bounds[1]) - np.array(bounds[0])))
+        self.sf = float(cdist(bounds, bounds, "euclidean").max())
 
         # Set objective
         self.n_obj = n_obj
@@ -41,15 +45,6 @@ class Problem:
         # Set other parameters
         self.name = kwargs.get("name", "ProblemWithNoName")
         self.plotable = kwargs.get("plotable", True)
-
-    def print(self):
-        """
-        Print summary of the problem in the console.
-        """
-        print(f"Problem:   {self.name}")
-        print(f"N° vars:   {self.n_var}")
-        print(f"N° objs:   {self.n_obj}")
-        print(f"N° consts: {self.n_con}")
 
     def plot(self, nx: int = 1000, display=True):
         """
@@ -67,8 +62,8 @@ class Problem:
         tuple
             Matplotlib's figure and axes objects.
         """
-        # Plot only 1D and 2D objective functions
-        if self.n_var < 3:
+        # Plot only 1D and 2D objective functions, and if the problem is plotable
+        if self.n_var < 3 and self.plotable:
 
             # Create figure
             fig, ax = plt.subplots()

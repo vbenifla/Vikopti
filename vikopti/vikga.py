@@ -1,14 +1,15 @@
-import os
 import time
-import yaml
+import warnings
 import numpy as np
-from pathlib import Path
 from scipy.spatial.distance import cdist
 from joblib import Parallel, delayed, wrap_non_picklable_objects
 from .config import Config
 from .problem import Problem
-from .results import Results
-from .operators import sample, compute_fitness, scale_fitness, cross, mutate
+from .logger import Logger
+from .operators.samples import sample
+from .fitness import compute_fitness, scale_fitness, get_optima
+from .operators.crossovers import cross
+from .operators.mutations import mutate
 
 
 class VIKGA:
@@ -26,86 +27,24 @@ class VIKGA:
 
     def __init__(self):
         """
-        Initialize the VIKGA object and set its default configuration.
+        Initialize the VIKGA object.
         """
         # Initialize default configuration
         self.config = Config()
 
-    def run(self, problem: Problem, **run_kwargs):
-        """
-        Run the algorithm for a given optimization problem.
-
-        Parameters
-        ----------
-        problem : Problem
-            The optimization problem to solve.
-        **run_kwargs : dict, optional
-            Keyword arguments to override the algorithm's configuration parameters.
-            Only keys matching attributes of "Config" are applied.
-            See the "Config" class for available parameters and their defaults.
-
-        Returns
-        -------
-        Results
-            Optimization results.
-        """
-        # Start the optimization process
-        self._start(problem, **run_kwargs)
-
-        # Initialize population
-        self._initialize()
-
-        # Make population evolve
-        while self._evolve():
-
-            # Compute current population fitness
-            self._fitness()
-
-            # Perform crossover, mutation and addition operation
-            self._crossover()
-            self._mutation()
-            self._addition()
-            self.c_gen += 1
-
-        # Compute final population fitness
-        self._fitness()
-
-        # Stop optimization process
-        self._stop()
-
-        return self.results
-
-    def _start(self, problem: Problem, **run_kwargs):
-        """
-        Start the optimization process.
-
-        Parameters
-        ----------
-        problem : Problem
-            The optimization problem to solve.
-        **run_kwargs : dict, optional
-            Keyword arguments to override the algorithm's configuration parameters.
-            Only keys matching attributes of "Config" are applied.
-            See the "Config" class for available parameters and their defaults.
-
-        """
-        # Set current optimization problem
-        self.pb = problem
-
-        # Override configuration with provided keyword arguments
-        for key, value in run_kwargs.items():
-            if hasattr(self.config, key):
-                setattr(self.config, key, value)
-            else:
-                print(f"Unknown config parameter: '{key}'")
+        # Initialize problem to solve
+        self.pb = None
 
         # Initialize population's arrays
-        self.x = np.zeros((self.config.n_max, self.pb.n_var))
-        self.dist = np.zeros((self.config.n_max, self.config.n_max))
-        self.obj = np.zeros((self.config.n_max, self.pb.n_obj))
-        self.const = np.zeros((self.config.n_max, self.pb.n_con))
-        self.f = np.zeros(self.config.n_max)
-        self.fs = np.zeros(self.config.n_max)
+        self.x = None
+        self.x_cross = None
+        self.x_mute = None
+        self.dist = None
+        self.obj = None
+        self.const = None
+        self.pen = None
+        self.f = None
+        self.fs = None
         self.mins = []
 
         # Initialize counters
@@ -113,176 +52,253 @@ class VIKGA:
         self.c_pop = 0
         self.c_cross = 0
         self.c_mute = 0
+        self.c_reject = 0
 
-        # Initialize results
-        self.gen = []
-        self.results = None
+        # Initialize logger
+        self.logger = None
 
-        # Initialize save directory
-        if self.config.save:
+    def run(self, pb: Problem, **run_kwargs):
+        """
+        Run the algorithm for a given optimization problem.
 
-            # Set save directory
-            if self.config.save_dir is None:
-                save_dir = Path.cwd() / "results" / self.pb.name
+        Parameters
+        ----------
+        pb : Problem
+            The optimization problem to solve.
+        **run_kwargs : dict, optional
+            Keyword arguments to override the algorithm's configuration parameters.
+            See the "Config" class for available parameters.
+        """
+        # Start optimization
+        self._start(pb, **run_kwargs)
+
+        # Initialize population
+        self._initialize()
+
+        # Loop over generations
+        for self.c_gen in range(1, self.config.n_gen + 1):
+
+            # Perform crossover, mutation and addition operation
+            self._crossover()
+            self._mutation()
+            self._addition()
+
+            # Compute current population fitness
+            self._fitness()
+
+            # Check convergence
+            if self._convergence():
+                break
+
+        # Stop optimization process
+        self._stop()
+
+    def run_multiple(self, pb: Problem, n_run=2, **run_kwargs):
+        """
+        Run the algorithm multiple times for a given optimization problem.
+
+        Parameters
+        ----------
+        pb : Problem
+            The optimization problem to solve.
+        n_run : int, optional
+            Number of runs, by default 2.
+        **run_kwargs : dict, optional
+            Keyword arguments to override the algorithm's configuration parameters.
+            See the "Config" class for available parameters.
+        """
+
+        # Loop on runs
+        for k in range(n_run):
+            self.run(pb, **run_kwargs, save_dir=f"run_{k}")
+
+    def _start(self, pb: Problem, **run_kwargs):
+        """
+        Start the optimization process.
+
+        Parameters
+        ----------
+        pb : Problem
+            The optimization problem to solve.
+        **run_kwargs : dict, optional
+            Keyword arguments to override the algorithm's configuration parameters.
+            See the "Config" class for available parameters.
+
+        """
+        # Set optimization problem
+        self.pb = pb
+
+        # Override configuration with provided keyword arguments
+        for key, value in run_kwargs.items():
+            if hasattr(self.config, key):
+                setattr(self.config, key, value)
             else:
-                save_dir = Path(self.config.save_dir)
-                save_dir = Path.cwd() / "results" / self.pb.name / save_dir
-            save_dir.mkdir(parents=True, exist_ok=True)
-            self.config.save_dir = save_dir
+                warnings.warn(f"Unknown config parameter: '{key}'", UserWarning)
 
-            # Initialize results files
-            files = ["gen.txt", "pop.txt", "mins.txt"]
-            for file in files:
-                with open(self.config.save_dir / file, "w") as f:
-                    f.write("")
+        # Set logger
+        if self.config.save:
+            self.logger = Logger(self.pb, self.config)
 
-            # Initialize summary file
-            config_dict = self.config.__dict__.copy()
-            config_dict["save_dir"] = str(config_dict["save_dir"])
-            pb_dict = {
-                "name": self.pb.name,
-                "vars": self.pb.vars,
-                "bounds": self.pb.bounds,
-                "objs": self.pb.objs,
-                "consts": self.pb.consts,
-                "limits": self.pb.limits,
-                "sf": self.pb.sf,
-            }
-            self.summary = {"config": config_dict, "pb": pb_dict}
-            with open(self.config.save_dir / "sum.yml", "w") as file:
-                yaml.dump(self.summary, file, default_flow_style=False)
+        # Set population's arrays
+        self.x = np.zeros((self.config.n_max, self.pb.n_var))
+        self.x_cross = np.zeros((self.config.n_cross, self.pb.n_var))
+        self.x_mute = np.zeros((self.config.n_mute, self.pb.n_var))
+        self.dist = np.zeros((self.config.n_max, self.config.n_max))
+        self.obj = np.zeros((self.config.n_max, self.pb.n_obj))
+        self.const = np.zeros((self.config.n_max, self.pb.n_con))
+        self.pen = np.zeros(self.config.n_max)
+        self.f = np.zeros(self.config.n_max)
+        self.fs = np.zeros(self.config.n_max)
+        self.mins = []
 
-        # Print problem considered
+        # Set counters
+        self.c_gen = 0
+        self.c_pop = 0
+        self.c_cross = 0
+        self.c_mute = 0
+        self.c_reject = 0
+
+        # Display considered problem
         if self.config.display:
             print("################################################")
             print("#################### VIKGA #####################")
             print("################################################")
-            self.pb.print()
-            print("#################### RUN #######################")
+            print("################### PROBLEM ####################")
+            print(f"Name:   {self.pb.name}")
+            print(f"N° vars:   {self.pb.n_var}")
+            print(f"N° objs:   {self.pb.n_obj}")
+            print(f"N° consts: {self.pb.n_con}")
+            print("##################### RUN ######################")
 
         # Start timer
         self.st = time.time()
 
     def _initialize(self):
         """
-        Generate and evaluate the initial population.
+        Initialize the population.
         """
-        # Generate sample
+        # Sample design variables within boundaries
         x_init = sample(self.config.n_min, self.pb.bounds, method=self.config.sample)
+        x_init = np.round(x_init, self.config.decimals)
 
         # Evaluate initial population
-        self._evaluate(x_init)
+        obj, const = self._evaluate(x_init)
 
-        # Initialize distance matrix
-        self.dist[: self.c_pop, : self.c_pop] = (
-            cdist(self.x[: self.c_pop], self.x[: self.c_pop], "euclidean") / self.pb.sf
-        )
+        # Update algorithm's population
+        self._update(x_init, obj, const)
+
+        # Log initial population
+        if self.config.save:
+            self.logger.log_pop(x_init, obj, const)
+
+        # Compute initial population fitness
+        self._fitness()
 
     def _evaluate(self, x: np.ndarray):
         """
-        Evaluate new individuals and update the population.
+        Evaluate new individuals to get objectives and constraints values.
 
         Parameters
         ----------
         x : np.ndarray
-            Array of individuals to evaluate.
+            Design variables to evaluate.
+
+        Returns
+        -------
+        obj : np.ndarray
+            Objective values.
+        const : np.ndarray
+            Constraints values.
         """
-        # Evaluate new individuals in parallel
+        # Get number of evaluations
         n_eval = len(x)
+
+        # Evaluate in parallel
         if self.config.parallel:
 
-            # Check number of proc
-            n_proc = min(self.config.n_proc, n_eval)
-            n_proc = max(2, n_proc)
+            # If more than one evaluations
+            if n_eval > 1:
 
-            # Joblib wrapper for pickling
-            @delayed
-            @wrap_non_picklable_objects
-            def func_wrapped(xi):
-                return self.pb.func(xi)
+                # Check number of process to use
+                n_proc = min(self.config.n_proc, n_eval)
 
-            res = Parallel(n_jobs=n_proc)(func_wrapped(xi) for xi in x)
+                # Joblib wrapper for pickling issues
+                @delayed
+                @wrap_non_picklable_objects
+                def func_wrapped(xi):
+                    return self.pb.func(xi)
 
-        # Evaluate new individuals sequentially
+                # Evaluate individuals in parallel
+                res = Parallel(n_jobs=n_proc)(func_wrapped(xi) for xi in x)
+
+            else:
+                # Evaluate individual
+                res = [self.pb.func(x[0])]
+
+        # Evaluate individuals sequentially
         else:
             res = [self.pb.func(xi) for xi in x]
 
         # Post process results
         res = np.array(res)
-        x = np.round(x, self.config.decimals)
         obj = res[:, : self.pb.n_obj]
         const = res[:, self.pb.n_obj :]
 
+        return obj, const
+
+    def _update(self, x, obj, const):
+        """
+        Update algorithm's population arrays.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Design variables.
+        obj : np.ndarray
+            Objective values.
+        const : np.ndarray
+            Constraints values.
+        """
+        # Get number of new individuals
+        n = len(x)
+
         # Update population's arrays
-        self.x[self.c_pop : self.c_pop + n_eval] = x
-        self.obj[self.c_pop : self.c_pop + n_eval] = obj
-        self.const[self.c_pop : self.c_pop + n_eval] = const
-        self.c_pop += n_eval
+        self.x[self.c_pop : self.c_pop + n] = x
+        self.obj[self.c_pop : self.c_pop + n] = obj
+        self.const[self.c_pop : self.c_pop + n] = const
 
-        # Log new evaluations
-        if self.config.save:
-            self._log_pop(x, obj, const)
+        # Update distance matrix
+        dist0 = self.dist[: self.c_pop, : self.c_pop]
+        dist1 = cdist(x, self.x[: self.c_pop], "euclidean") / self.pb.sf
+        dist2 = cdist(x, x, "euclidean") / self.pb.sf
+        self.dist[: self.c_pop + n, : self.c_pop + n] = np.block(
+            [[dist0, dist1.T], [dist1, dist2]]
+        )
 
-    def _evolve(self):
-        """
-        Check if the algorithm is evolving.
-
-        Returns
-        -------
-        bool
-            True if the algorithm has not converged, False otherwise.
-        """
-        # Check maximum population size
-        if self.c_pop == self.config.n_max:
-            if self.config.display:
-                print("\nMaximum population size reached!")
-            return False
-
-        # Check maximum generation
-        if self.c_gen == self.config.n_gen:
-            if self.config.display:
-                print("\nMaximum generation number reached!")
-            return False
-
-        # Check convergence
-        if self.c_gen >= 2 * self.config.n_conv:
-            recent_best = [g[-1] for g in self.gen[-self.config.n_conv :]]
-            recent_xs = self.x[recent_best]
-            recent_objs = self.obj[recent_best]
-            obj_range = np.max(recent_objs) - np.min(recent_objs)
-            std_per_var = np.std(recent_xs, axis=0)
-            if (obj_range < 1e-6) and (np.all(std_per_var < 1e-6)):
-                if self.config.display:
-                    print(
-                        f"\nConvergence: obj_range={obj_range}, x_std={std_per_var} !"
-                    )
-                return False
-        return True
+        # Update population size
+        self.c_pop += n
 
     def _fitness(self):
         """
-        Compute the fitness and scaled fitness of the current population.
+        Compute fitness and scaled fitness of the current population.
         """
         # Consider current population values
-        obj = self.obj[: self.c_pop, 0]
+        obj = self.obj[: self.c_pop]
         const = self.const[: self.c_pop]
-        dist = self.dist[: self.c_pop, : self.c_pop]
 
-        # Compute fitness
-        self.f[: self.c_pop], self.is_feasible, self.pen = compute_fitness(
-            obj, const, alpha=self.config.alpha
-        )
+        # Compute current population fitness
+        self.f[: self.c_pop], self.pen[: self.c_pop] = compute_fitness(obj, const)
 
-        # Compute scaled fitness
+        # Compute current population scaled fitness
         self.fs[: self.c_pop], self.mins = scale_fitness(
             self.f[: self.c_pop],
-            dist,
-            self.is_feasible,
+            self.pen[: self.c_pop],
+            self.dist[: self.c_pop, : self.c_pop],
             d=self.config.d_mins,
             n=self.config.n_mins,
         )
 
-        # Print info in the console
+        # Display current generation info
         if self.config.display:
             print(
                 f"\rGeneration {self.c_gen}: {self.c_pop} individuals and {len(self.mins)} local minima",
@@ -290,207 +306,166 @@ class VIKGA:
             )
 
         # Log current generation results
-        self.gen.append(
-            [self.c_pop, self.c_cross, self.c_mute, len(self.mins), self.mins[0]]
-        )
         if self.config.save:
-            self._log_gen()
+            data = [
+                self.c_pop,
+                self.c_cross,
+                self.c_mute,
+                self.c_reject,
+                len(self.mins),
+                self.mins[0],
+            ]
+            self.logger.log_gen(data)
 
     def _crossover(self):
         """
-        Perform crossover to generate new offspring.
+        Perform crossover operation.
         """
-
-        # Init crossover offsprings
-        self.x_cross = np.zeros((self.config.n_cross * 2, self.pb.n_var))
-
-        # Get fitness-proportionate probability
+        # Compute fitness-proportionate probability
         p_fit = self.fs[: self.c_pop] / np.sum(self.fs[: self.c_pop])
 
         # Loop on crossovers
         for i in range(self.config.n_cross):
 
-            # Select first parents using fitness-proportionate probability and Debs ruled tournament
-            n_select = 8
-            selection = np.random.choice(self.c_pop, n_select, replace=False, p=p_fit)
+            # Select first parents using fitness-proportionate probability
+            id_p1 = np.random.choice(len(p_fit), p=p_fit)
 
-            # Apply Deb's rules to pick the best first parent
-            id_p1 = selection[0]
-            for ind in selection[1:]:
-                if all(~self.is_feasible[[ind, id_p1]]):
-                    if self.pen[ind] < self.pen[id_p1]:
-                        id_p1 = ind
-                elif all(self.is_feasible[[ind, id_p1]]):
-                    if self.fs[id_p1] < self.fs[ind]:
-                        id_p1 = ind
-                else:
-                    id_p1 = np.array([ind, id_p1])[self.is_feasible[[ind, id_p1]]][0]
-
-            # Select second parents using distance-proportionate probability related to the first parent
-            id_pop = np.setdiff1d(np.arange(self.c_pop), id_p1)
-            prox = 1.0 / self.dist[id_pop, id_p1]
+            # Select second parents using first parent distance-proportionate probability
+            prox = 1.0 / (1e-12 + self.dist[: self.c_pop, id_p1])
             p_dist = prox / np.sum(prox)
-            crowd = np.random.choice(
-                id_pop, self.config.n_crowd, p=p_dist, replace=False
-            )
+            crowd = np.random.choice(len(p_dist), 8, p=p_dist, replace=False)
             id_p2 = crowd[np.argmax(self.fs[crowd])]
 
             # Cross parents
-            x_off1, x_off2 = cross(
+            self.x_cross[i] = cross(
                 self.x[id_p1],
                 self.x[id_p2],
                 self.pb.bounds,
                 method=self.config.crossover,
                 eta=self.config.eta_c,
             )
-            self.x_cross[i * 2] = x_off1
-            self.x_cross[i * 2 + 1] = x_off2
 
     def _mutation(self):
         """
-        Perform mutation to generate new offspring.
+        Perform mutation operation.
         """
-        # Init mutant offsprings
-        self.x_mute = np.zeros((self.config.n_mute, self.pb.n_var))
-
-        # Select random individuals to mutate from
-        i_mute = np.random.choice(self.c_pop, size=self.config.n_mute, replace=False)
-
         # Loop on mutations
         for k in range(self.config.n_mute):
 
+            # Select random individuals to mutate
+            id_mute = np.random.choice(self.c_pop)
+
             # Mute individual
             self.x_mute[k] = mutate(
-                self.x[i_mute[k]],
+                self.x[id_mute],
                 self.pb.bounds,
                 method=self.config.mutation,
                 eta=self.config.eta_m,
+                pm=self.config.pm,
             )
 
     def _addition(self):
         """
         Add new offsprings to the population.
         """
+        # Reset counters
+        id_add = []
+        id_reject = []
+        self.c_cross = 0
+        self.c_mute = 0
 
         # Loop on all offsprings
         x_off = np.vstack((self.x_cross, self.x_mute))
-        id_add = []
-        c_add = [0, 0]
+        x_off = np.round(x_off, self.config.decimals)
         for i, x in enumerate(x_off):
-            if self.c_pop + sum(c_add) < self.config.n_max:
+            if self.c_pop + len(id_add) < self.config.n_max:
 
                 # Get closest individual
-                dists = np.linalg.norm(self.x[: self.c_pop] - x, axis=1) / self.pb.sf
-                id_nei = np.argmin(dists)
+                dists = cdist([x], self.x[: self.c_pop])[0] / self.pb.sf
+                idx = np.argmin(dists)
 
                 # Check distance threshold to add offspring
-                if dists[id_nei] > self.config.d0 * (
-                    1.001 - self.fs[id_nei] * (1 - 0.5 * (0.9**self.c_gen))
+                if dists[idx] > 0.08 * (
+                    1.001 - self.fs[idx] * (1 - 0.5 * (0.9 ** (self.c_gen + 1)))
                 ):
+                    # if dists[idx] > 0.1 * (1 - self.fs[idx] ** 2 * 0.95):
+
+                    # Add individuals and update counters
                     id_add.append(i)
-
-                    # Count crossovers/mutations
                     if i < len(self.x_cross):
-                        c_add[0] += 1
+                        self.c_cross += 1
                     else:
-                        c_add[1] += 1
+                        self.c_mute += 1
 
-        # Update counters
-        self.c_cross = c_add[0]
-        self.c_mute = c_add[1]
+                # Reject individual
+                else:
+                    id_reject.append(i)
+                    self.c_reject += 1
+
+            # Maximum population size reached
+            else:
+                break
 
         # Evaluate new individuals
-        if sum(c_add) > 0:
-            self._evaluate(x_off[id_add])
+        if len(id_add) > 0:
+            obj, const = self._evaluate(x_off[id_add])
 
-            # update distance matrix
-            x_add = self.x[self.c_pop - sum(c_add) : self.c_pop]
-            dist0 = (
-                cdist(x_add, self.x[: self.c_pop - sum(c_add)], "euclidean")
-                / self.pb.sf
-            )
-            dist1 = cdist(x_add, x_add, "euclidean") / self.pb.sf
-            self.dist[: self.c_pop, : self.c_pop] = np.block(
-                [
-                    [
-                        self.dist[: self.c_pop - sum(c_add), : self.c_pop - sum(c_add)],
-                        dist0.T,
-                    ],
-                    [dist0, dist1],
-                ]
-            )
+            # Update algorithm's population
+            self._update(x_off[id_add], obj, const)
+
+            # Log new individuals
+            if self.config.save:
+                self.logger.log_pop(x_off[id_add], obj, const)
+
+        # Log rejected population
+        if self.config.save:
+            self.logger.log_reject(x_off[id_reject])
+
+    def _convergence(self):
+        """
+        Check if the algorithm converged.
+
+        Returns
+        -------
+        bool
+            True if the algorithm converged, False otherwise.
+        """
+        # Check maximum population size
+        if self.c_pop == self.config.n_max:
+            if self.config.display:
+                print("\nMaximum population size reached!")
+            return True
+
+        # Check maximum number of generation
+        if self.c_gen == self.config.n_gen:
+            if self.config.display:
+                print("\nMaximum generation number reached!")
+            return True
+
+        # Check distances from each local optimum to its nearest neighbor
+        mins_dist = np.sort(self.dist[self.mins, : self.c_pop])[:, 1]
+        if sum(mins_dist) < 1e-4:
+            if self.config.display:
+                print(f"\nConvergence: sum={sum(mins_dist)}, mean={np.mean(mins_dist)}")
+            return True
+
+        return False
 
     def _stop(self):
+        """
+        Stop the optimization process.
+        """
         # Stop timer
         self.et = time.time()
 
-        # Get results
-        x = self.x[: self.c_pop]
-        obj = self.obj[: self.c_pop]
-        const = self.const[: self.c_pop]
-        f = self.f[: self.c_pop, np.newaxis]
-        fs = self.fs[: self.c_pop, np.newaxis]
-        pop = np.concatenate([x, obj, const, f, fs], axis=1)
-        gen = np.array(self.gen)
-
-        # Update and save summary
-        self.summary["res"] = {
-            "run_time": round(self.et - self.st, 2),
-            "n_eval": self.c_pop,
-            "mins": self.mins,
-            "x": self.x[self.mins[0]].tolist(),
-            "obj": self.obj[self.mins[0]].tolist(),
-            "const": self.const[self.mins[0]].tolist(),
-        }
-        if self.config.save:
-            with open(self.config.save_dir / "sum.yml", "w") as file:
-                yaml.dump(self.summary, file, default_flow_style=False)
-
-        # Make results object
-        self.results = Results(self.summary, pop, gen)
-
-        # Print and plot results
+        # Display results
         if self.config.display:
-            print()
-            self.results.print()
-        if self.config.plot:
-            self.results.plot()
-
-    def _log_pop(self, x: np.ndarray, obj: np.ndarray, const: np.ndarray):
-        """
-        Log the population data.
-
-        Parameters
-        ----------
-        x : np.ndarray
-            Array of individuals to log.
-        obj : np.ndarray
-            Array of objectives to log.
-        const : np.ndarray
-            Array of constraints to log.
-        """
-        # Prepare lines to write
-        lines = []
-        for i in range(len(x)):
-            data = (
-                [str(v) for v in x[i]]
-                + [str(v) for v in obj[i]]
-                + [str(v) for v in const[i]]
-            )
-            line = " ".join(data) + "\n"
-            lines.append(line)
-
-        # Write all lines at once
-        fpath = os.path.join(self.config.save_dir, "pop.txt")
-        with open(fpath, "a") as file:
-            file.writelines(lines)
-
-    def _log_gen(self):
-        """
-        Log the generation data.
-        """
-        # Log generation data
-        line = f"{self.c_pop} {self.c_cross} {self.c_mute} {len(self.mins)} {self.mins[0]}\n"
-        fpath = os.path.join(self.config.save_dir, "gen.txt")
-        with open(fpath, "a") as file:
-            file.write(line)
+            print("################### RESULTS ####################")
+            print(f"N° gens:  {self.c_gen}")
+            print(f"N° evals: {self.c_pop}")
+            print(f"N° saves: {self.c_reject}")
+            print(f"Run time: {round(self.et - self.st, 2)} s")
+            print("Local minima:")
+            for x, obj in zip(self.x[self.mins], self.obj[self.mins, 0]):
+                print(f"x={x} | obj={obj}")
+            print("################################################")

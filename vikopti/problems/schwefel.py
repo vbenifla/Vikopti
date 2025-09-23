@@ -1,5 +1,5 @@
 import numpy as np
-from vikopti.problem import Problem
+from ..problem import Problem
 
 
 class Schwefel(Problem):

@@ -1,9 +1,10 @@
+import warnings
 import numpy as np
 
 
-def sbx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
+def ux(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
     """
-    Perform the Simulated Binary Crossover (SBX).
+    Uniform crossover between two parent variables.
 
     Parameters
     ----------
@@ -11,9 +12,35 @@ def sbx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
         First parent variable.
     x2 : float
         Second parent variable.
-    b0 : float
+    xl : float
         Lower bound for the variable.
-    b1 : float
+    xu : float
+        Upper bound for the variable.
+
+    Returns
+    -------
+    float
+        Offspring variable.
+    """
+    # Sample uniformly between the two parents
+    xo = np.random.uniform(x1, x2)
+
+    return xo
+
+
+def sbx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
+    """
+    Perform Simulated Binary Crossover (SBX) between two parent variables.
+
+    Parameters
+    ----------
+    x1 : float
+        First parent variable.
+    x2 : float
+        Second parent variable.
+    xl : float
+        Lower bound for the variable.
+    xu : float
         Upper bound for the variable.
     eta : float, optional
         Distribution index for SBX, by default 5.0.
@@ -23,9 +50,13 @@ def sbx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
     tuple
         Two offspring variables.
     """
+
+    # Order parents design variables
     x1, x2 = min(x1, x2), max(x1, x2)
+
+    # Compute probability density
     u = np.random.rand()
-    delta = min((x1 - b0), (b1 - x2))
+    delta = min((x1 - xl), (xu - x2))
     gamma = 1 + 2 * delta / (x2 - x1)
     alpha = 2 - gamma ** (-eta - 1)
     if u <= 1 / alpha:
@@ -33,19 +64,18 @@ def sbx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
     else:
         beta = (1.0 / (2.0 - alpha * u)) ** (1.0 / (eta + 1))
 
+    # randomly picks between children
     if np.random.rand() < 0.5:
-        xo1 = 0.5 * ((1 + beta) * x1 + (1 - beta) * x2)
-        xo2 = 0.5 * ((1 - beta) * x1 + (1 + beta) * x2)
+        xo = 0.5 * ((1 + beta) * x1 + (1 - beta) * x2)
     else:
-        xo2 = 0.5 * ((1 + beta) * x1 + (1 - beta) * x2)
-        xo1 = 0.5 * ((1 - beta) * x1 + (1 + beta) * x2)
+        xo = 0.5 * ((1 - beta) * x1 + (1 + beta) * x2)
 
-    return xo1, xo2
+    return xo
 
 
-def pnx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
+def pnx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
     """
-    Perform Parent-Centric Normal Crossover (PNX).
+    Perform Parent-Centric Normal Crossover (PNX) between two parent variables.
 
     Parameters
     ----------
@@ -53,9 +83,9 @@ def pnx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
         First parent variable.
     x2 : float
         Second parent variable.
-    b0 : float
+    xl : float
         Lower bound for the variable.
-    b1 : float
+    xu : float
         Upper bound for the variable.
     eta : float, optional
         Scaling factor for PNX, by default 5.0.
@@ -65,15 +95,20 @@ def pnx(x1: float, x2: float, b0: float, b1: float, eta: float = 5.0):
     tuple
         Two offspring variables.
     """
+    # Check eta
     if eta == 0:
         eta = 1e-6
-    xo1 = np.random.normal(x1, np.abs(x2 - x1) / eta)
-    xo2 = np.random.normal(x2, np.abs(x2 - x1) / eta)
-    return xo1, xo2
+
+    # randomly picks between children
+    if np.random.rand() < 0.5:
+        xo = np.random.normal(x1, np.abs(x2 - x1) / eta)
+    else:
+        xo = np.random.normal(x2, np.abs(x2 - x1) / eta)
+    return xo
 
 
 # Dictionary mapping method names to functions
-CROSSOVERS = {"sbx": sbx, "pnx": pnx}
+_CROSSOVERS = {"ux": ux, "sbx": sbx, "pnx": pnx}
 
 
 def cross(
@@ -100,17 +135,27 @@ def cross(
     tuple
         Two offspring variables.
     """
+    # Some checks
+    if not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
+        raise ValueError("bounds must be a list [lower_bounds, upper_bounds]")
+    if len(bounds[0]) != len(bounds[1]):
+        raise ValueError("lower_bounds and upper_bounds must have the same length")
+    if method not in _CROSSOVERS:
+        warnings.warn(f"Unknown method '{method}', using 'ux' instead.", UserWarning)
+        method = "ux"
+
+    # Init offspring
     n = len(xp1)
-    xo1 = np.copy(xp1)
-    xo2 = np.copy(xp2)
+    xo = np.zeros(n)
+
+    # Make crossover
     for i in range(n):
         if xp2[i] != xp1[i]:
-            xo1[i], xo2[i] = CROSSOVERS[method](
-                xp1[i], xp2[i], bounds[0][i], bounds[1][i], eta
-            )
-            if xo1[i] < bounds[0][i] or xo1[i] > bounds[1][i]:
-                xo1[i] = xp1[i]
-            if xo2[i] < bounds[0][i] or xo2[i] > bounds[1][i]:
-                xo2[i] = xp2[i]
+            xo[i] = _CROSSOVERS[method](xp1[i], xp2[i], bounds[0][i], bounds[1][i], eta)
+        else:
+            xo[i] = xp1[i]
 
-    return xo1, xo2
+    # Make sure offspring is within bounds
+    xo = np.clip(xo, bounds[0], bounds[1])
+
+    return xo
