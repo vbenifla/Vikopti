@@ -38,7 +38,7 @@ pip install -e .
 
 ## 🚀 Usage/Examples
 
-New users are recommended to begin by looking at the files provided in the [examples](./examples) folder.
+New users are recommended to begin by looking at the files provided in the [examples](./examples) and [tests](./tests) folders.
 
 ## 🗒️ Documentation and Issues
 

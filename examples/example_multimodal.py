@@ -6,10 +6,16 @@ def main():
 
     # Initialize algorithm and problem
     algo = VIKGA()
-    pb = Schwefel()
+    pb = GLC()
 
     # Run optimization
-    algo.run(pb)
+    run_kwargs = {
+        "n_min": 50,
+        "n_max": 5000,
+        "n_gen": 300,
+        "decimals": 3,
+    }
+    algo.run(pb, **run_kwargs)
 
 
 if __name__ == "__main__":

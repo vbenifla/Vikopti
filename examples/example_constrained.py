@@ -10,11 +10,10 @@ def main():
 
     # Run optimization
     run_kwargs = {
-        "n_min": 200,
+        "n_min": 100,
         "n_max": 5000,
-        "n_gen": 3000,
-        "n_conv": 500,
-        "decimals": 4,
+        "n_gen": 500,
+        "decimals": 3,
     }
     algo.run(pb, **run_kwargs)
 
