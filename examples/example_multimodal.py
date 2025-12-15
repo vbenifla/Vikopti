@@ -1,4 +1,4 @@
-from vikopti import VIKGA
+from vikopti import VIKGA, Results
 from vikopti.problems import Schwefel, GLC, Rosen
 
 
@@ -6,16 +6,19 @@ def main():
 
     # Initialize algorithm and problem
     algo = VIKGA()
-    pb = GLC()
+    pb = Rosen()
 
     # Run optimization
-    run_kwargs = {
-        "n_min": 50,
-        "n_max": 5000,
-        "n_gen": 300,
-        "decimals": 3,
-    }
+    run_kwargs = {"n_min": 50, "n_gen": 1000}
     algo.run(pb, **run_kwargs)
+
+    # Make results object
+    res = Results(algo.config.save_dir)
+
+    # Plot some results
+    res.plot_pop()
+    res.plot_const()
+    res.plot_obj(display=True)
 
 
 if __name__ == "__main__":

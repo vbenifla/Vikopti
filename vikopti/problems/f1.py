@@ -7,7 +7,7 @@ class F1(Problem):
         super().__init__(
             bounds=[[-1], [1]],
             n_con=1 if constrained else 0,
-            name="simple",
+            name="f1",
         )
 
     def func(self, x):
@@ -26,7 +26,7 @@ class F1(Problem):
             f0 += H[i] * np.exp(-W[i] * (x0 - X[i]) ** 2)
 
         # compute constraints
-        g0 = -np.sin(10 * x0)
+        # g0 = -np.sin(10 * x0)
         # g0 = x0 - 0.5
         g0 = 0.8 - abs(x0 - 0.4) / 0.4
 

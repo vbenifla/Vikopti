@@ -48,22 +48,21 @@ class Config:
         Number of processes for parallel execution.
     """
 
-    n_min: int = 50
+    n_min: int = 100
     n_max: int = 1000
-    n_gen: int = 100
-    n_cross: int = 20
-    n_mute: int = 10
+    n_gen: int = 500
+    n_cross: int = 10
+    n_mute: int = 6
     sample: str = "lhs"
     crossover: str = "sbx"
-    eta_c: float = 20.0
+    eta_c: float = 15.0
     mutation: str = "pm"
-    eta_m: float = 5.0
-    pm: float = 0.75
+    eta_m: float = 1.0
+    pm: float = 0.3
     d_mins: float = 0.1
     n_mins: int = 10
     display: bool = True
     save: bool = True
     save_dir: str = None
-    decimals: int = 4
     parallel: bool = False
     n_proc: int = 2

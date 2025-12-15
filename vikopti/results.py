@@ -71,7 +71,7 @@ class Results:
         self.plot_const()
         self.plot_pop(display=True)
 
-    def plot_pop(self, param="f", display=False):
+    def plot_pop(self, param="fs", display=False):
         """
         Plot final population.
 
@@ -154,7 +154,7 @@ class Results:
                 hue=df[param],
                 palette=CMAP,
                 size=df[param],
-                sizes=(20, 10),
+                sizes=(5, 20),
             )
 
             # Pairwise contour plot of the population

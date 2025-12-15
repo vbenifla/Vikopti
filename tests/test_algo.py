@@ -1,5 +1,6 @@
 import os
 from vikopti import VIKGA
+from vikopti.problems import Rosen
 from vikopti.problems import Beam
 
 
@@ -11,15 +12,12 @@ def test():
 
     # Set run options
     run_kwargs = {
-        "n_min": 50,
+        "n_min": 30,
         "n_max": 1000,
-        "sample": "sobol",
+        "sample": "lhs",
         "crossover": "pnx",
         "mutation": "um",
         "pm": 1,
-        "n_mins": 10,
-        "d_mins": 0.15,
-        "decimals": 3,
         "save_dir": "test",
     }
 

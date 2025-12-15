@@ -1,4 +1,5 @@
 import numpy as np
+from math import sqrt
 from ..problem import Problem
 
 
@@ -46,11 +47,11 @@ class Beam(Problem):
         J = 2 * np.sqrt(2) * h * l * (l**2 / 12 + ((h + t) / 2) ** 2)
         tau_pp = M * R / J
         tau = np.sqrt(tau_p**2 + tau_pp**2 + tau_p * tau_pp * l / R)
-        g0 = tau - 13600.0
+        g0 = tau - 13600
 
         # Bending stress constraint
         sigma = 6 * P * L / (b * t**2)
-        g1 = sigma - 30000.0
+        g1 = sigma - 30000
 
         # Geometric constraints
         g2 = h - b
@@ -70,3 +71,47 @@ class Beam(Problem):
         g6 = P - Pc
 
         return (f0, g0, g1, g2, g3, g4, g5, g6)
+
+    # def __init__(self):
+    #     super().__init__(
+    #         bounds=[[0.1, 0.1, 0.1, 0.1], [2, 10, 10, 2]],
+    #         name="beam",
+    #         vars=["h", "l", "t", "b"],
+    #     )
+
+    # def func(self, x):
+
+    #     y = 1.10471*x[0]**2*x[1]+0.04811*x[2]*x[3]*(14.0+x[1])
+
+    #     # parameters
+    #     P = 6000; L = 14; E = 30e+6; G = 12e+6;
+    #     t_max = 13600; s_max = 30000; d_max = 0.25;
+
+    #     M = P*(L+x[1]/2)
+    #     R = sqrt(0.25*(x[1]**2+(x[0]+x[2])**2))
+    #     J = 2*(sqrt(2)*x[0]*x[1]*(x[1]**2/12+0.25*(x[0]+x[2])**2));
+    #     P_c = (4.013*E/(6*L**2))*x[2]*x[3]**3*(1-0.25*x[2]*sqrt(E/G)/L);
+    #     t1 = P/(sqrt(2)*x[0]*x[1]); t2 = M*R/J;
+    #     t = sqrt(t1**2+t1*t2*x[1]/R+t2**2);
+    #     s = 6*P*L/(x[3]*x[2]**2)
+    #     d = 4*P*L**3/(E*x[3]*x[2]**3);
+    #     # Constraints
+    #     g1 = t-t_max; #done
+    #     g2 = s-s_max; #done
+    #     g3 = x[0]-x[3];
+    #     g4 = 0.10471*x[0]**2+0.04811*x[2]*x[3]*(14.0+x[1])-5.0;
+    #     g5 = 0.125-x[0];
+    #     g6 = d-d_max;
+    #     g7 = P-P_c; #done
+
+    #     g=[g1,g2,g3,g4,g5,g6,g7]
+    #     g_round=np.round(np.array(g),6)
+    #     w1=100
+    #     w2=100
+
+    #     phi=sum(max(item,0) for item in g_round)
+    #     viol=sum(float(num) > 0 for num in g_round)
+
+    #     reward = (y + (w1*phi + w2*viol))
+
+    #     return (reward,)

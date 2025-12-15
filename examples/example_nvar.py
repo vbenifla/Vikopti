@@ -1,17 +1,17 @@
 from vikopti import VIKGA
-from vikopti.problems import F1
+from vikopti.problems import Sphere
 
 
-def main():
+def main(n=2):
 
     # Initialize algorithm and problem
     algo = VIKGA()
-    pb = F1(False)
+    pb = Sphere(n)
 
     # Run optimization
-    run_kwargs = {"n_min": 20, "n_mins": 4}
+    run_kwargs = {"n_max": 5000, "d_mins": 0.5}
     algo.run(pb, **run_kwargs)
 
 
 if __name__ == "__main__":
-    main()
+    main(6)

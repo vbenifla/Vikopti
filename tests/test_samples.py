@@ -14,7 +14,7 @@ def test(n_var=2):
     # Generate samples
     n = 32
     data = []
-    for method in ["lhs", "sobol"]:
+    for method in ["random", "lhs", "sobol"]:
         xs = sample(n, bounds, method=method)
         print(len(xs))
         for x in xs:

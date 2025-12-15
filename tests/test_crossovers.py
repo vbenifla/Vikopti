@@ -105,10 +105,11 @@ def test(n_var=2, method="sbx", random=False):
     )
 
     plt.tight_layout()
-    plt.show()
 
 
 if __name__ == "__main__":
     test(method="ux")
+    test(method="bx")
     test(method="pnx", random=True)
     test(5, "sbx", True)
+    plt.show()

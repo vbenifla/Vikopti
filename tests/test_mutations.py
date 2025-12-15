@@ -102,10 +102,10 @@ def test(n_var=2, method="pm", random=False):
     )
 
     plt.tight_layout()
-    plt.show()
 
 
 if __name__ == "__main__":
     test(method="um")
     test(method="nm", random=True)
-    test(5, "pm", True)
+    test(5, "pm", random=True)
+    plt.show()

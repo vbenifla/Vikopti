@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 
 
-def ux(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
+def ux(x1: float, x2: float, xl: float, xu: float, eta: float = None):
     """
     Uniform crossover between two parent variables.
 
@@ -16,21 +16,21 @@ def ux(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
         Lower bound for the variable.
     xu : float
         Upper bound for the variable.
+    eta : float, optional
+        Scaling factor, by default None.
 
     Returns
     -------
     float
         Offspring variable.
     """
-    # Sample uniformly between the two parents
-    xo = np.random.uniform(x1, x2)
 
-    return xo
+    return np.random.uniform(x1, x2)
 
 
-def sbx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
+def bx(x1: float, x2: float, xl: float, xu: float, eta: float = 0.1):
     """
-    Perform Simulated Binary Crossover (SBX) between two parent variables.
+    Blend crossover between two parent variables.
 
     Parameters
     ----------
@@ -43,12 +43,47 @@ def sbx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
     xu : float
         Upper bound for the variable.
     eta : float, optional
-        Distribution index for SBX, by default 5.0.
+        Scaling factor, by default 0.1.
 
     Returns
     -------
-    tuple
-        Two offspring variables.
+    float
+        Offspring variable.
+    """
+
+    # Blend the individuals
+    gamma = (1.0 + 2.0 * eta) * np.random.uniform() - eta
+
+    # Random pick
+    if np.random.uniform() < 0.5:
+        xo = (1.0 - gamma) * x1 + gamma * x2
+    else:
+        xo = gamma * x1 + (1.0 - gamma) * x2
+
+    return xo
+
+
+def sbx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
+    """
+    Simulated Binary Crossover (SBX) between two parent variables.
+
+    Parameters
+    ----------
+    x1 : float
+        First parent variable.
+    x2 : float
+        Second parent variable.
+    xl : float
+        Lower bound for the variable.
+    xu : float
+        Upper bound for the variable.
+    eta : float, optional
+        Scaling factor, by default 5.0.
+
+    Returns
+    -------
+    float
+        Offspring variable.
     """
 
     # Order parents design variables
@@ -64,7 +99,7 @@ def sbx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
     else:
         beta = (1.0 / (2.0 - alpha * u)) ** (1.0 / (eta + 1))
 
-    # randomly picks between children
+    # Random pick
     if np.random.rand() < 0.5:
         xo = 0.5 * ((1 + beta) * x1 + (1 - beta) * x2)
     else:
@@ -75,7 +110,7 @@ def sbx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
 
 def pnx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
     """
-    Perform Parent-Centric Normal Crossover (PNX) between two parent variables.
+    Parent-Centric Normal Crossover (PNX) between two parent variables.
 
     Parameters
     ----------
@@ -88,34 +123,39 @@ def pnx(x1: float, x2: float, xl: float, xu: float, eta: float = 5.0):
     xu : float
         Upper bound for the variable.
     eta : float, optional
-        Scaling factor for PNX, by default 5.0.
+        Scaling factor, by default 5.0.
 
     Returns
     -------
-    tuple
-        Two offspring variables.
+    float
+        Offspring variable.
     """
+
     # Check eta
     if eta == 0:
         eta = 1e-6
 
-    # randomly picks between children
+    # Compute delta
+    delta = np.abs(x2 - x1)
+
+    # Random pick
     if np.random.rand() < 0.5:
-        xo = np.random.normal(x1, np.abs(x2 - x1) / eta)
+        xo = np.random.normal(x1, delta / eta)
     else:
-        xo = np.random.normal(x2, np.abs(x2 - x1) / eta)
+        xo = np.random.normal(x2, delta / eta)
+
     return xo
 
 
 # Dictionary mapping method names to functions
-_CROSSOVERS = {"ux": ux, "sbx": sbx, "pnx": pnx}
+_CROSSOVERS = {"ux": ux, "bx": bx, "sbx": sbx, "pnx": pnx}
 
 
 def cross(
-    xp1: np.ndarray, xp2: np.ndarray, bounds: np.ndarray, method="sbx", eta: float = 5.0
+    xp1: np.ndarray, xp2: np.ndarray, bounds: np.ndarray, method="sbx", eta: float = 1.0
 ):
     """
-    Perform crossover between two parents using the specified method.
+    Perform crossover operation between two parents variables using the specified method.
 
     Parameters
     ----------
@@ -126,30 +166,33 @@ def cross(
     bounds : list
         A two element list with the lower and upper bounds of each variables.
     method : str, optional
-        crossover method, by default "sbx".
+        Crossover method, by default "sbx".
     eta : float, optional
-        Factor for the crossover operator, by default 5.0.
+        Scaling factor, by default 1.0.
 
     Returns
     -------
-    tuple
-        Two offspring variables.
+    np.ndarray
+        Offspring variables.
     """
+
     # Some checks
     if not isinstance(bounds, (list, tuple)) or len(bounds) != 2:
         raise ValueError("bounds must be a list [lower_bounds, upper_bounds]")
     if len(bounds[0]) != len(bounds[1]):
         raise ValueError("lower_bounds and upper_bounds must have the same length")
     if method not in _CROSSOVERS:
-        warnings.warn(f"Unknown method '{method}', using 'ux' instead.", UserWarning)
-        method = "ux"
+        warnings.warn(f"Unknown method '{method}', using 'sbx' instead.", UserWarning)
+        method = "sbx"
 
-    # Init offspring
+    # Initialize offspring array
     n = len(xp1)
     xo = np.zeros(n)
 
     # Make crossover
     for i in range(n):
+
+        # If parents are not the same
         if xp2[i] != xp1[i]:
             xo[i] = _CROSSOVERS[method](xp1[i], xp2[i], bounds[0][i], bounds[1][i], eta)
         else:

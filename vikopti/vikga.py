@@ -1,15 +1,17 @@
+import os
 import time
 import warnings
 import numpy as np
+from pathlib import Path
 from scipy.spatial.distance import cdist
 from joblib import Parallel, delayed, wrap_non_picklable_objects
 from .config import Config
 from .problem import Problem
 from .logger import Logger
 from .operators.samples import sample
-from .fitness import compute_fitness, scale_fitness, get_optima
 from .operators.crossovers import cross
 from .operators.mutations import mutate
+from .fitness import compute_fitness, scale_fitness
 
 
 class VIKGA:
@@ -93,7 +95,7 @@ class VIKGA:
         # Stop optimization process
         self._stop()
 
-    def run_multiple(self, pb: Problem, n_run=2, **run_kwargs):
+    def run_multiple(self, pb: Problem, n_run=2, save_dir=None, **run_kwargs):
         """
         Run the algorithm multiple times for a given optimization problem.
 
@@ -103,6 +105,8 @@ class VIKGA:
             The optimization problem to solve.
         n_run : int, optional
             Number of runs, by default 2.
+        save_dir : str, optional
+            Path to runs folder, by default None.
         **run_kwargs : dict, optional
             Keyword arguments to override the algorithm's configuration parameters.
             See the "Config" class for available parameters.
@@ -110,7 +114,15 @@ class VIKGA:
 
         # Loop on runs
         for k in range(n_run):
-            self.run(pb, **run_kwargs, save_dir=f"run_{k}")
+
+            # Build the save directory path
+            if save_dir:
+                new_save_dir = Path(save_dir) / f"run_{k}"
+            else:
+                new_save_dir = Path(f"run_{k}")
+
+            # Run the algorithm
+            self.run(pb, **run_kwargs, save_dir=new_save_dir)
 
     def _start(self, pb: Problem, **run_kwargs):
         """
@@ -125,6 +137,12 @@ class VIKGA:
             See the "Config" class for available parameters.
 
         """
+        # Display info
+        if self.config.display:
+            print("################################################")
+            print("#################### VIKGA #####################")
+            print("################################################")
+
         # Set optimization problem
         self.pb = pb
 
@@ -160,9 +178,6 @@ class VIKGA:
 
         # Display considered problem
         if self.config.display:
-            print("################################################")
-            print("#################### VIKGA #####################")
-            print("################################################")
             print("################### PROBLEM ####################")
             print(f"Name:   {self.pb.name}")
             print(f"N° vars:   {self.pb.n_var}")
@@ -179,7 +194,6 @@ class VIKGA:
         """
         # Sample design variables within boundaries
         x_init = sample(self.config.n_min, self.pb.bounds, method=self.config.sample)
-        x_init = np.round(x_init, self.config.decimals)
 
         # Evaluate initial population
         obj, const = self._evaluate(x_init)
@@ -328,18 +342,19 @@ class VIKGA:
         for i in range(self.config.n_cross):
 
             # Select first parents using fitness-proportionate probability
-            id_p1 = np.random.choice(len(p_fit), p=p_fit)
+            idx_p1 = np.random.choice(self.c_pop, p=p_fit)
 
             # Select second parents using first parent distance-proportionate probability
-            prox = 1.0 / (1e-12 + self.dist[: self.c_pop, id_p1])
+            prox = 1.0 / (1e-12 + self.dist[: self.c_pop, idx_p1])
+            prox[idx_p1] = 0.0
             p_dist = prox / np.sum(prox)
-            crowd = np.random.choice(len(p_dist), 8, p=p_dist, replace=False)
-            id_p2 = crowd[np.argmax(self.fs[crowd])]
+            crowd = np.random.choice(self.c_pop, size=5, replace=False, p=p_dist)
+            idx_p2 = crowd[np.argmax(self.fs[crowd])]
 
             # Cross parents
             self.x_cross[i] = cross(
-                self.x[id_p1],
-                self.x[id_p2],
+                self.x[idx_p1],
+                self.x[idx_p2],
                 self.pb.bounds,
                 method=self.config.crossover,
                 eta=self.config.eta_c,
@@ -349,15 +364,15 @@ class VIKGA:
         """
         Perform mutation operation.
         """
+        # Select random individuals to mutate
+        idx_mute = np.random.choice(self.c_pop, size=self.config.n_mute, replace=False)
+
         # Loop on mutations
         for k in range(self.config.n_mute):
 
-            # Select random individuals to mutate
-            id_mute = np.random.choice(self.c_pop)
-
             # Mute individual
             self.x_mute[k] = mutate(
-                self.x[id_mute],
+                self.x[idx_mute[k]],
                 self.pb.bounds,
                 method=self.config.mutation,
                 eta=self.config.eta_m,
@@ -369,29 +384,34 @@ class VIKGA:
         Add new offsprings to the population.
         """
         # Reset counters
-        id_add = []
-        id_reject = []
+        idx_add = []
+        idx_reject = []
         self.c_cross = 0
         self.c_mute = 0
 
         # Loop on all offsprings
         x_off = np.vstack((self.x_cross, self.x_mute))
-        x_off = np.round(x_off, self.config.decimals)
         for i, x in enumerate(x_off):
-            if self.c_pop + len(id_add) < self.config.n_max:
+
+            # Check population size
+            if self.c_pop + len(idx_add) < self.config.n_max:
 
                 # Get closest individual
-                dists = cdist([x], self.x[: self.c_pop])[0] / self.pb.sf
-                idx = np.argmin(dists)
+                x_dists = cdist([x], self.x[: self.c_pop])[0] / self.pb.sf
+                idx = np.argmin(x_dists)
+                d_min = x_dists[idx]
+                f_min = self.fs[idx]
+                d0 = self.config.d_mins
+                d1_max = 1e-3
+                d1_min = 1e-8
+                d1 = d1_max - (d1_max - d1_min) * (self.c_pop / self.config.n_max)
+                threshold = (d1 - d0) * f_min + d0
 
-                # Check distance threshold to add offspring
-                if dists[idx] > 0.08 * (
-                    1.001 - self.fs[idx] * (1 - 0.5 * (0.9 ** (self.c_gen + 1)))
-                ):
-                    # if dists[idx] > 0.1 * (1 - self.fs[idx] ** 2 * 0.95):
+                # Check threshold
+                if d_min > threshold:
 
                     # Add individuals and update counters
-                    id_add.append(i)
+                    idx_add.append(i)
                     if i < len(self.x_cross):
                         self.c_cross += 1
                     else:
@@ -399,7 +419,7 @@ class VIKGA:
 
                 # Reject individual
                 else:
-                    id_reject.append(i)
+                    idx_reject.append(i)
                     self.c_reject += 1
 
             # Maximum population size reached
@@ -407,19 +427,19 @@ class VIKGA:
                 break
 
         # Evaluate new individuals
-        if len(id_add) > 0:
-            obj, const = self._evaluate(x_off[id_add])
+        if len(idx_add) > 0:
+            obj, const = self._evaluate(x_off[idx_add])
 
             # Update algorithm's population
-            self._update(x_off[id_add], obj, const)
+            self._update(x_off[idx_add], obj, const)
 
             # Log new individuals
             if self.config.save:
-                self.logger.log_pop(x_off[id_add], obj, const)
+                self.logger.log_pop(x_off[idx_add], obj, const)
 
         # Log rejected population
-        if self.config.save:
-            self.logger.log_reject(x_off[id_reject])
+        if self.config.save and len(idx_reject) > 0:
+            self.logger.log_reject(x_off[idx_reject])
 
     def _convergence(self):
         """
@@ -442,13 +462,6 @@ class VIKGA:
                 print("\nMaximum generation number reached!")
             return True
 
-        # Check distances from each local optimum to its nearest neighbor
-        mins_dist = np.sort(self.dist[self.mins, : self.c_pop])[:, 1]
-        if sum(mins_dist) < 1e-4:
-            if self.config.display:
-                print(f"\nConvergence: sum={sum(mins_dist)}, mean={np.mean(mins_dist)}")
-            return True
-
         return False
 
     def _stop(self):
@@ -466,6 +479,6 @@ class VIKGA:
             print(f"N° saves: {self.c_reject}")
             print(f"Run time: {round(self.et - self.st, 2)} s")
             print("Local minima:")
-            for x, obj in zip(self.x[self.mins], self.obj[self.mins, 0]):
-                print(f"x={x} | obj={obj}")
+            for x, obj, pen in zip(self.x[self.mins], self.obj[self.mins, 0], self.pen[self.mins]):
+                print(f"x={x} | obj={obj} | pen={pen}")
             print("################################################")

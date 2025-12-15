@@ -9,13 +9,11 @@ def main():
     pb = Beam()
 
     # Run optimization
-    run_kwargs = {
-        "n_min": 100,
-        "n_max": 5000,
-        "n_gen": 500,
-        "decimals": 3,
-    }
-    algo.run(pb, **run_kwargs)
+    run_kwargs = {"n_max": 5000, "n_gen": 2000, "d_mins":0.2}
+
+    # Run optimziations
+    algo.run(pb, save_dir="test", **run_kwargs)
+    # algo.run_multiple(pb, 3, save_dir="validation", **run_kwargs)
 
 
 if __name__ == "__main__":
