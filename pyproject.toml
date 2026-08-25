@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vikopti"
+version = "9.2"
+description = "A Python project for design optimization using genetic algorithms"
+readme = "README.md"
+authors = [{name = "Victor Benifla", email = "vbenifla@gmail.com" }]
+requires-python = ">=3.11"
+dependencies = [
+	"pyyaml",
+    "numpy",
+	"pandas",
+    "scipy",
+    "joblib",
+	"matplotlib",
+    "seaborn",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["vikopti"]
+
+[tool.uv]
+package = true
