@@ -1,4 +1,4 @@
-# 🧬 VIKopti 🧬
+# 🧬 Vikopti 🧬
 
 This is a `Python` project for design optimization using an efficient `Genetic Algorithm`, inspired by the process described in [M. Hall. (2012)](https://arxiv.org/abs/1304.0751) with some cool additional features.
 
@@ -8,8 +8,8 @@ Make sure you have a recent Python version installed (>= 3.11).
 Clone or download the project repository and go to its directory:
 
 ```console
-git clone https://github.com/vbenifla/VIKopti.git
-cd VIKopti
+git clone https://github.com/vbenifla/Vikopti.git
+cd Vikopti
 ```
 
 Install the package:
