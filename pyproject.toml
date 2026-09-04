@@ -9,6 +9,7 @@ description = "A Python project for design optimization using genetic algorithms
 readme = "README.md"
 authors = [{name = "Victor Benifla", email = "vbenifla@gmail.com" }]
 requires-python = ">=3.11"
+license = "MIT"
 dependencies = [
 	"pyyaml",
     "numpy",

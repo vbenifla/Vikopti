@@ -4,7 +4,7 @@ This is a `Python` project for design optimization using an efficient `Genetic A
 
 ## 🛠️ Installation
 
-Make sure Python and all dependencies are already installed.
+Make sure you have a recent Python version installed (>= 3.11).
 Clone or download the project repository and go to its directory:
 
 ```console
@@ -20,9 +20,17 @@ pip install .
 
 ## 🚀 Usage/Examples
 
-New users are recommended to look at the files provided in the [examples](./examples) folder.
+New users are recommended to look at the files provided in the [examples](./examples) folder, for example:
+
+```console
+python examples/example_multimodal.py
+```
 
 ## 🗒️ Documentation and Issues
 
 So far, no documentation is available.
 If any issue, bug, error, or whatsoever arises, just let me know! :)
+
+## 📜 License
+
+This project is licensed under the [MIT License](./LICENSE).
